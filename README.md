@@ -121,7 +121,4 @@ Ensure you have these libraries installed in the Arduino IDE:
 - ✅ Implement **Telemetry Feedback** for battery and signal strength
 - ✅ Optimize **PPM Signal Timing**
 
----
-## 📞 **Support & Contact**
-For any issues, reach out via **GitHub Issues** or contact me at **your.email@example.com** 🚀
 

@@ -1,124 +1,102 @@
-# STM32 NRF24L01 Transmitter & PPM Receiver
 
-## 📌 Overview
-This project consists of a **wireless transmitter and receiver system** using an **STM32 microcontroller**, an **NRF24L01 module**, and **PPM output** for controlling an FC (Flight Controller). The transmitter reads joystick inputs, sends them wirelessly using NRF24L01, and the receiver converts the received data into PPM signals for the flight controller.
+Project: SBUS over NRF24L01+ Transmission for INAV / Betaflight
+Date: 2025-04-26
 
-## 🛠 Components Used
-### **Transmitter (TX)**
-- **STM32 Black Pill (STM32F411)**
-- **NRF24L01+ Module**
-- **Joystick (Analog)**
-- **SSD1306 OLED Display**
-- **Push Buttons (For Auxiliary Channels)**
+Author: [Your Name]
 
-### **Receiver (RX)**
-- **STM32 Black Pill (STM32F411)**
-- **NRF24L01+ Module**
-- **PPM Output to Flight Controller (FC)**
+Description:
+------------
+This project implements wireless SBUS transmission using NRF24L01+ modules
+and GD32F103 (or STM32F103) microcontrollers.
 
----
-## 🔧 **Transmitter Code Explanation**
-### **1️⃣ Read Analog Inputs**
-The STM32 reads joystick values from analog pins:
-```cpp
-// Read ADC values
- data.throttle = analogRead(PA2);
- data.yaw      = analogRead(PA3);
- data.pitch    = analogRead(PA1);
- data.roll     = analogRead(PA0);
- data.aux1     = analogRead(PA4);
- data.aux2     = analogRead(PA5);
- data.aux3     = analogRead(PA6);
- data.aux4     = analogRead(PA7);
-```
+- The TX side reads analog and digital signals (joystick and switches),
+  converts them into SBUS format, and sends them wirelessly via NRF24L01+.
+- The RX side receives the SBUS packets and outputs standard SBUS signal
+  through UART (for use with INAV, Betaflight, or any SBUS receiver input).
 
-### **2️⃣ Adjust ADC Scaling for 2.9V Max Input**
-Since the joystick max voltage is **2.9V** instead of **3.3V**, we scale the values:
-```cpp
-// Normalize ADC readings for correct mapping
-data.throttle = map(analogRead(PA2), 0, 3598, 0, 4095);
-data.yaw      = map(analogRead(PA3), 0, 3598, 0, 4095);
-data.pitch    = map(analogRead(PA1), 0, 3598, 0, 4095);
-data.roll     = map(analogRead(PA0), 0, 3598, 0, 4095);
-```
+Hardware Connections:
+----------------------
 
-### **3️⃣ Transmit Data Using NRF24L01**
-The data is sent over **NRF24L01+** to the receiver:
-```cpp
-bool success = radio.write(&data, sizeof(DataPacket));
-if (success) {
-    Serial.println("✅ Data Sent Successfully.");
-} else {
-    Serial.println("❌ Data Transmission Failed.");
-}
-```
+TX SIDE:
+- CE  -> PB5
+- CSN -> PB4
+- SPI -> SPI1
+- Analog inputs:
+    - Throttle -> PA2
+    - Yaw      -> PA3
+    - Roll     -> PA0
+    - Pitch    -> PA1
+- Switch inputs (Digital with pull-up):
+    - AUX1 -> PB8
+    - AUX2 -> PB3
 
----
-## 🔧 **Receiver Code Explanation**
-### **1️⃣ Receive Data From TX**
-```cpp
-if (radio.available()) {
-    radio.read(&data, sizeof(DataPacket));
-}
-```
+RX SIDE:
+- CE  -> PB5
+- CSN -> PB4
+- SPI -> SPI1
+- SBUS Output via USART2 TX (PA2)
+- Debugging via USB Serial (Serial / USART1)
 
-### **2️⃣ Convert Data to PPM Output**
-```cpp
-ppmChannels[0] = map(data.throttle, 0, 3598, 1000, 2000);
-ppmChannels[1] = map(data.yaw, 0, 3598, 1000, 2000);
-ppmChannels[2] = map(data.pitch, 0, 3598, 1000, 2000);
-ppmChannels[3] = map(data.roll, 0, 3598, 1000, 2000);
-```
-This ensures the received joystick values are mapped to **PPM signals** (1000-2000μs range) for the Flight Controller.
+Important Notes:
+----------------
 
----
-## 📌 **Installation & Setup**
-### **1️⃣ Wiring Connections**
-#### **Transmitter (TX)**
-| STM32 Black Pill | NRF24L01 |
-|------------------|----------|
-| 3.3V            | VCC      |
-| GND             | GND      |
-| PB15            | MOSI     |
-| PB14            | MISO     |
-| PB13            | SCK      |
-| PB12            | CSN      |
-| PB1             | CE       |
+1. NRF24L01+ modules require stable 3.3V power!
+   - Add 10µF–100µF capacitor between VCC and GND pins near NRF module.
+   - If using high-power modules (PA+LNA), use a good 3.3V regulator.
 
-#### **Receiver (RX)**
-| STM32 Black Pill | NRF24L01 |
-|------------------|----------|
-| 3.3V            | VCC      |
-| GND             | GND      |
-| PB15            | MOSI     |
-| PB14            | MISO     |
-| PB13            | SCK      |
-| PB12            | CSN      |
-| PB1             | CE       |
+2. Voltage brownout during motor startup can reset the RX board.
+   - Add a 470µF (or larger) capacitor between 3.3V and GND on RX side.
+   - Ensure stable 5V supply to the board if stepping down to 3.3V.
 
-### **2️⃣ Install Required Libraries**
-Ensure you have these libraries installed in the Arduino IDE:
-- `RF24 by TMRh20`
-- `Adafruit GFX`
-- `Adafruit SSD1306`
+3. SBUS Frame Details:
+   - 25 bytes per frame.
+   - Baudrate 100000bps, 8 data bits, Even parity, 2 stop bits (8E2).
 
-### **3️⃣ Upload Code to STM32**
-1. Install **STM32CubeProgrammer** and **STM32duino Bootloader**.
-2. Connect STM32 via **USB TTL Adapter**.
-3. Flash the TX and RX firmware.
+4. Calibration of Channels:
+   - Analog channels are mapped into SBUS range (172–1811).
+   - Adjust mapping ranges in TX code if needed based on joystick values.
 
----
-## 🎯 **Project Features**
-✅ **PPM Output for Flight Controller**
-✅ **Wireless Communication using NRF24L01**
-✅ **OLED Display for Debugging**
-✅ **Customizable Joystick Mapping**
-✅ **Supports Auxiliary Channels (AUX1-AUX4)**
+5. Flags:
+   - SBUS flags (byte 23) can set "failsafe" and "frame lost" if needed.
 
----
-## 📌 **Future Improvements**
-- ✅ Add **Failsafe Mode** in case of signal loss
-- ✅ Implement **Telemetry Feedback** for battery and signal strength
-- ✅ Optimize **PPM Signal Timing**
+Compilation:
+------------
 
+Use Arduino IDE or PlatformIO with STM32duino or GD32 Arduino Core.
+
+Board: "Generic STM32F103C8" or "GD32F103C8"
+Upload Method: STM32duino bootloader / Serial bootloader
+
+Dependencies:
+-------------
+- RF24 Arduino library
+  (https://github.com/nRF24/RF24)
+
+- STM32duino (or GD32 Arduino Core)
+
+How to Use:
+-----------
+
+1. Flash the TX code to the transmitter board.
+2. Flash the RX code to the receiver board.
+3. Connect the RX SBUS output to flight controller SBUS input.
+4. Configure INAV / Betaflight receiver settings to "Serial RX" -> "SBUS".
+5. Adjust AUX switches and arming ranges inside configurator if necessary.
+6. Add capacitors if RX resets during motor spin-up.
+
+Troubleshooting:
+----------------
+
+- "Receiver Ready" printed multiple times => RX rebooting => Add capacitors!
+- SBUS values not reaching FC => check UART configuration and SBUS polarity.
+- High packet loss => Lower NRF24L01+ data rate to 1Mbps if necessary.
+
+License:
+--------
+MIT License. Free to use and modify.
+
+Credits:
+--------
+- Based on standard SBUS protocol documentation.
+- NRF24 communication based on TMRh20's RF24 library.
 

@@ -1,5 +1,6 @@
 
-Project: SBUS over NRF24L01+ Transmission for INAV / Betaflight  using GD32F103C8T6 (STM32 Bluepill Clone)
+Project: SBUS over NRF24L01+ Transmission for INAV / Betaflight  
+Tested on GD32F103C8T6 (STM32F103 Bluepill Clone)
 Date: 2025-04-26
 
 Description:
@@ -89,9 +90,6 @@ Troubleshooting:
 - SBUS values not reaching FC => check UART configuration and SBUS polarity.
 - High packet loss => Lower NRF24L01+ data rate to 1Mbps if necessary.
 
-License:
---------
-MIT License. Free to use and modify.
 
 Credits:
 --------
